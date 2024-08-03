@@ -20,12 +20,16 @@
         <div class="row">
             <div class="col-12">
                 <h1 class="text-center">Chat Room</h1>
-                <div class="input-group mb-3">
-                    <label class="input-group-text" for="channelSelect">Channels</label>
-                    <select class="form-select" id="channelSelect">
-                        <option value="general" selected>General</option>
-                    </select>
+
+                <div class="dropdown mb-1">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="channelSelect"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        General
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="channelSelect" id="channelList">
+                    </ul>
                 </div>
+
                 <div class="input-group mb-3">
                     <input id="newChannel" type="text" class="form-control" placeholder="Create new channel">
                     <button class="btn btn-secondary" id="createChannel">Create</button>
@@ -57,7 +61,7 @@
         const form = document.getElementById('form');
         const input = document.getElementById('input');
         const messages = document.getElementById('messages');
-        const channelSelect = document.getElementById('channelSelect');
+        const channelList = document.getElementById('channelList');
         const newChannelInput = document.getElementById('newChannel');
         const createChannelButton = document.getElementById('createChannel');
         const activeUsers = document.getElementById('activeUsers');
@@ -68,6 +72,7 @@
             e.preventDefault();
             if (input.value) {
                 socket.emit('chat message', { channel: currentChannel, msg: input.value });
+
                 input.value = '';
             }
         });
@@ -86,7 +91,7 @@
             activeUsers.innerHTML = '';
             socket.emit('join channel', currentChannel);
         });
-
+        var lastMessage = '';
         var suggestions = [];
 
         input.addEventListener('keydown', (e) => {
@@ -115,6 +120,16 @@
                         input.setSelectionRange(cursor, input.value.length);
                     }
                 }
+            }
+
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+
+                if (lastMessage) {
+                    input.value = lastMessage;
+                }
+
+
             }
 
         });
@@ -214,6 +229,10 @@
                     }, 10);
                 });
 
+                if (result.user === socket.id) {
+                    item.classList.add('text-end');
+                    lastMessage = result.msgRaw;
+                }
 
                 if (mention.test(result.msg)) {
                     const alert = document.createElement('div');
@@ -232,10 +251,10 @@
             }
         });
 
-        socket.on('system message', (msg) => {
+        socket.on('system message', (data) => {
             const item = document.createElement('li');
-            item.textContent = msg;
-            item.classList = 'list-group-item text-center text-primary';
+            item.textContent = data.msg;
+            item.classList = 'list-group-item text-center text-' + data.type;
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
         });
@@ -259,14 +278,28 @@
         });
 
         socket.on('update channels', (channels) => {
-            channelSelect.innerHTML = '';
+            channelList.innerHTML = '';
+            console.log(channels);
             channels.forEach(channel => {
-                const option = document.createElement('option');
-                option.value = channel;
-                option.textContent = channel;
-                channelSelect.appendChild(option);
+                //{ name: 'general', users: 5}
+                const item = document.createElement('li');
+                item.classList = 'dropdown-item';
+                item.textContent = channel.name + " "
+                const span = document.createElement('span');
+                span.classList = 'badge bg-secondary';
+                span.textContent = channel.users;
+                item.appendChild(span);
+
+                item.addEventListener('click', () => {
+                    currentChannel = channel.name;
+                    messages.innerHTML = '';
+                    activeUsers.innerHTML = '';
+                    socket.emit('join channel', currentChannel);
+                });
+                channelList.appendChild(item);
+
             });
-            channelSelect.value = currentChannel;
+            document.getElementById('channelSelect').innerHTML = currentChannel
         });
 
         socket.on('update users', (users) => {
@@ -317,12 +350,10 @@
                 if (temaaaStorage != "dark") {
                     document.body.setAttribute('data-bs-theme', "dark");
                     localStorage.setItem('theme', "dark");
-                    themeButton.classList = "btn btn-light";
                 }
                 else {
                     document.body.setAttribute('data-bs-theme', "light");
                     localStorage.setItem('theme', "light")
-                    themeButton.classList = "btn btn-dark";
                 }
             } else if (theme === 'dark' || theme === 'light') {
                 document.body.setAttribute('data-bs-theme', theme);
@@ -330,7 +361,16 @@
                 themeButton.innerHTML = theme === 'dark' ? "<div><i class=\"bi bi-sun-fill\"></i></div>" : "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
                 themeButton.classList = theme === 'dark' ? "btn btn-light" : "btn btn-dark";
             }
-          
+            const themeS = localStorage.getItem('theme');
+            for (let i = 0; i < 720; i++) {
+                setTimeout(() => {
+                    document.querySelector('#darkMode div').style.transform = `rotate(${i}deg)`;
+                    if (i == 360) {
+                        themeButton.innerHTML = themeS === 'dark' ? "<div><i class=\"bi bi-sun-fill\"></i></div>" : "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
+                        themeButton.classList = themeS === 'dark' ? "btn btn-light" : "btn btn-dark";
+                    }
+                }, i * 1);
+            }
         }
 
         const theme = localStorage.getItem('theme');

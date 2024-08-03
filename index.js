@@ -23,22 +23,29 @@ const channels = { general: [], random: [], tech: [] };
 
 var usersTyping = {};
 
+const MESSAGE_LIMIT = 5;
+const TIME_FRAME = 5000;
+
+let messageCount = {};
+
 io.on('connection', (socket) => {
     let currentChannel = 'general';
     socket.join(currentChannel);
     channels[currentChannel].push(socket.id);
     updateChannelsAndUsers();
-    io.to(currentChannel).emit('system message', '+ User ' + socket.id + ' connected');
+    io.to(currentChannel).emit('system message', { msg: `+ User ${socket.id} connected`, type: "success" });
 
     socket.on('join channel', (channel) => {
         socket.leave(currentChannel);
         channels[currentChannel] = channels[currentChannel].filter(id => id !== socket.id);
-        io.to(currentChannel).emit('system message', `- User ${socket.id} left channel ${currentChannel}`);
-        currentChannel = channel;
+        if (currentChannel !== channel) {
+            io.to(currentChannel).emit('system message', { msg: `- User ${socket.id} left channel ${currentChannel}`, type: "danger" });
+            currentChannel = channel;
+        }
         socket.join(currentChannel);
         channels[currentChannel].push(socket.id);
         updateChannelsAndUsers();
-        io.to(currentChannel).emit('system message', `+ User ${socket.id} joined channel ${currentChannel}`);
+        io.to(currentChannel).emit('system message', { msg: `+ User ${socket.id} joined channel ${currentChannel}`, type: "success" });
     });
 
     socket.on('create channel', (newChannel) => {
@@ -51,19 +58,32 @@ io.on('connection', (socket) => {
     socket.on('chat message', (data) => {
         const { channel, msg } = data;
         const user = socket.id;
+
+        if (!messageCount[user]) {
+            messageCount[user] = [];
+        }
+
+        const currentTime = Date.now();
+        messageCount[user] = messageCount[user].filter(timestamp => currentTime - timestamp < TIME_FRAME);
+        if (messageCount[user].length > MESSAGE_LIMIT) {
+            socket.emit('system message', { msg: 'You are sending messages too quickly', type: 'danger' });
+            return;
+        }
+
+        messageCount[user].push(currentTime);
+
+
         io.to(channel).emit('chat message', { channel, user, msg: markdown.render(msg), msgRaw: msg });
         if (usersTyping[channel]) {
             usersTyping[channel] = usersTyping[channel].filter(id => id !== socket.id);
             socket.broadcast.to(channel).emit('typing', usersTyping[channel]);
         }
-
-
     });
 
     socket.on('disconnect', () => {
         channels[currentChannel] = channels[currentChannel].filter(id => id !== socket.id);
         updateChannelsAndUsers();
-        io.to(currentChannel).emit('system message', '- User ' + socket.id + ' disconnected');
+        io.to(currentChannel).emit('system message', { msg: `- User ${socket.id} disconnected`, type: "danger" });
         if (usersTyping[currentChannel]) {
             usersTyping[currentChannel] = usersTyping[currentChannel].filter(id => id !== socket.id);
             socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
@@ -87,7 +107,11 @@ io.on('connection', (socket) => {
 
 function updateChannelsAndUsers() {
     const channelNames = Object.keys(channels);
-    io.emit('update channels', channelNames);
+    const channelArray = []; //{name: 'general', users: 5}
+    channelNames.forEach(channel => {
+        channelArray.push({ name: channel, users: channels[channel].length });
+    });
+    io.emit('update channels', channelArray);
     channelNames.forEach(channel => {
         io.to(channel).emit('update users', channels[channel]);
     });
