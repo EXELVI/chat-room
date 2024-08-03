@@ -53,6 +53,10 @@
                 </ul>
                 <form id="form" class="mt-3">
                     <small class="text-muted" id="typing"></small>
+                    <div class="input-group my-1">
+                        <input id="fileInput" type="file" class="form-control" aria-label="Upload file">
+                        <button class="btn btn-secondary" id="uploadFile" disabled>Upload</button>
+                    </div>
                     <div class="input-group">
                         <textarea id="input" class="form-control" placeholder="Type a message..." rows="1"
                             aria-label="Type a message..." aria-describedby="button-addon2"></textarea>
@@ -71,12 +75,26 @@
 
                         <button class="btn btn-primary">Send</button>
                     </div>
-                    <div class="input-group my-1">
-                        <input id="fileInput" type="file" class="form-control" aria-label="Upload file">
-                        <button class="btn btn-secondary" id="uploadFile" disabled>Upload</button>
-                    </div>
+
 
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" id="imageModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Image preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <img id="imagePreview" src="" alt="Image preview" class="img-fluid checked">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
@@ -103,6 +121,7 @@
                 reader.onload = () => {
                     socket.emit('file upload', { channel: currentChannel, file: reader.result, fileName: file.name });
                     fileInput.value = '';
+                    uploadFileButton.disabled = true;
                 };
                 reader.readAsDataURL(file);
             }
@@ -243,7 +262,7 @@
                 case 'm':
                 case 'v':
                 case 'vb':
-                case 'f':              
+                case 'f':
                     return 'bi-file-earmark-code';
                 default:
                     return 'bi-file-earmark';
@@ -418,7 +437,6 @@
 
         document.getElementById('activity').addEventListener('click', (e) => {
             e.preventDefault();
-            // if input has a valid user mention in active users, send activity
             var split = input.value.split(' ');
             var user = split[split.length - 1].substring(1);
             var found = checkForValidUser(user);
@@ -712,6 +730,7 @@
                 strong.textContent = result.user;
                 console.debug(result);
                 item.appendChild(strong);
+                item.id = Math.random().toString(36).substring(7);
                 item.innerHTML += `${result.msg}`;
                 item.classList = 'list-group-item';
                 const mention = new RegExp(`@${socket.id}`, 'g');
@@ -737,6 +756,25 @@
                         input.focus();
                         contextMenu.remove();
                     });
+                    const react = document.createElement('button');
+                    react.classList = 'btn btn-secondary';
+                    react.textContent = '👍';
+                    react.addEventListener('click', () => {
+                        socket.emit('react', { channel: currentChannel, user: result.user, message: result.msgRaw, id: item.id, reaction: '👍' });
+                        contextMenu.remove();
+                    });
+                    contextMenu.appendChild(react);
+
+                    const react2 = document.createElement('button');
+                    react2.classList = 'btn btn-secondary';
+                    react2.textContent = '👎';
+                    react2.addEventListener('click', () => {
+                        socket.emit('react', { channel: currentChannel, user: result.user, message: result.msgRaw, id: item.id, reaction: '👎' });
+                        contextMenu.remove();
+                    });
+
+                    contextMenu.appendChild(react2);
+
                     contextMenu.appendChild(buttonReply);
                     contextMenu.style.position = 'absolute';
                     contextMenu.style.top = `${e.pageY}px`;
@@ -794,7 +832,44 @@
 
                 messages.appendChild(item);
                 Prism.highlightAll();
+                const images = document.querySelectorAll('img');
+                images.forEach(img => {
+                    if (img.classList.contains('checked')) return;
+                    img.classList.add("img-fluid", "img-thumbnail", "checked");
+                 
+                    img.addEventListener('click', () => {
+
+                        const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+                        const modalImage = document.getElementById('imagePreview');
+                        let image = img.src
+
+
+                        modalImage.src = image;
+                        modal.show();
+                    });
+                });
                 window.scrollTo(0, document.body.scrollHeight);
+            }
+        });
+
+        socket.on('react', (data) => {
+            const item = document.getElementById(data.id);
+            if (!item) return;
+            const reactions = item.querySelectorAll('.reaction');
+            let found = false;
+
+            reactions.forEach(reaction => {
+                if (reaction.textContent.split(' ')[0] === data.reaction) {
+                    found = true;
+                    console.log(reaction.textContent.split(' ')[1])
+                    reaction.textContent = `${reaction.textContent.split(' ')[0]} ${parseInt(reaction.textContent.split(' ')[1]) + 1}`;
+                }
+            });
+            if (!found) {
+                const reaction = document.createElement('span');
+                reaction.classList = 'reaction badge bg-secondary';
+                reaction.textContent = data.reaction + ' 1';
+                item.appendChild(reaction);
             }
         });
 
@@ -938,6 +1013,7 @@
                 Notification.requestPermission();
             }
         });
+
 
 
     </script>

@@ -134,6 +134,10 @@ io.on('connection', (socket) => {
             activities.splice(activities.indexOf(activity), 1); 
         }
     });
+    socket.on('react', (data) => {
+        io.to(data.channel).emit('react', data);
+    })
+
 
 
     socket.on('typing', () => {
