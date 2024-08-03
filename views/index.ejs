@@ -9,7 +9,16 @@
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/prism.css">
-
+    <style>
+        .error-popover {
+            --bs-popover-max-width: 200px;
+            --bs-popover-border-color: var(--bs-danger);
+            --bs-popover-header-bg: var(--bs-danger);
+            --bs-popover-header-color: var(--bs-white);
+            --bs-popover-body-padding-x: 1rem;
+            --bs-popover-body-padding-y: .5rem;
+        }
+    </style>
 </head>
 
 <body>
@@ -32,6 +41,7 @@
 
                 <div class="input-group mb-3">
                     <input id="newChannel" type="text" class="form-control" placeholder="Create new channel">
+
                     <button class="btn btn-secondary" id="createChannel">Create</button>
                 </div>
                 <div id="usersList" class="mb-3">
@@ -46,6 +56,7 @@
                     <div class="input-group">
                         <textarea id="input" class="form-control" placeholder="Type a message..." rows="1"
                             aria-label="Type a message..." aria-describedby="button-addon2"></textarea>
+                        <button class="btn btn-secondary" id="activityTris"><i class="bi bi-triangle"></i></button>
                         <button class="btn btn-primary">Send</button>
                     </div>
                 </form>
@@ -184,6 +195,149 @@
             socket.emit('stop typing', { channel: currentChannel, user: socket.id });
         });
 
+        document.getElementById('activityTris').addEventListener('click', (e) => {
+            e.preventDefault();
+            // if input has a valid user mention in active users, send activity
+            var split = input.value.split(' ');
+            var user = split[split.length - 1].substring(1);
+            var usersLi = document.querySelectorAll('#activeUsers li');
+            var users = [];
+            usersLi.forEach(u => {
+                const li = document.createElement('li');
+                li.innerText = u.textContent.replace(' (You)', '');
+                users.push(li);
+            });
+            var found = false;
+            users.forEach(u => {
+                if (u.textContent === user) {
+                    found = true;
+                }
+            });
+            if (found) {
+                socket.emit('create activity', { user: user, type: 'tris' });
+            } else {
+                var popover = new bootstrap.Popover(document.getElementById('activityTris'), {
+                    content: 'User not found',
+                    title: 'Error',
+                    trigger: 'manual',
+                    placement: 'top',
+                    customClass: 'error-popover'
+                });
+                popover.show();
+                setTimeout(() => {
+                    popover.hide();
+                }, 2000);
+
+            }
+
+        });
+
+        function getButtons(board, disabled) {
+            let buttonContainer = document.createElement('div')
+            buttonContainer.className = 'container text-center'
+            for (let i = 0; i < 3; i++) {
+                let col = document.createElement('div')
+                col.className = 'col'
+                for (let j = 0; j < 3; j++) {
+                    let button = document.createElement('button')
+                    button.type = 'button'
+                    button.id = i * 3 + j
+                    button.className = 'btn btn-' + (board[i][j] == "X" ? "primary" : (board[i][j] == "O" ? "danger" : "secondary")) + " m-1"
+                    button.innerText = board[i][j] == "X" ? "✖️" : (board[i][j] == "O" ? "⚫" : "➖")
+                    button.disabled = disabled || (board[i][j] == "X" || board[i][j] == "O")
+                    col.appendChild(button)
+                }
+                buttonContainer.appendChild(col)
+            }
+            return buttonContainer
+        }
+
+
+        function checkDraw(board) {
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    if (board[i][j] === '') {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function checkWin(board, player) {
+            for (let i = 0; i < 3; i++) {
+                if (board[i][0] === player && board[i][1] === player && board[i][2] === player) {
+                    return true;
+                }
+                if (board[0][i] === player && board[1][i] === player && board[2][i] === player) {
+                    return true;
+                }
+            }
+            if (board[0][0] === player && board[1][1] === player && board[2][2] === player) {
+                return true;
+            }
+            if (board[0][2] === player && board[1][1] === player && board[2][0] === player) {
+                return true;
+            }
+            return false;
+        }
+
+        socket.on("activity created", (data) => {
+            if (data.type == "tris") {
+                /*data: 
+{
+            player1: socket.id,
+            player2: data.user,
+            type: data.type,
+            channel: currentChannel,
+            board: [['', '', ''], ['', '', ''], ['', '', '']],
+            currentPlayer: "X",
+            win: false, 
+            draw: false,
+            startTime: Date.now(),
+            id: 0, //random: 1-1000000
+        }
+                */
+                const item = document.createElement('li');
+                item.classList = 'list-group-item text-center';
+                const board = document.createElement('div');
+                board.id = 'board' + data.id
+
+                board.innerHTML = getButtons(data.board, false).innerHTML
+                item.appendChild(document.createTextNode(`${data.player1} started a tris game with ${data.player2}`))
+                const p1 = document.createElement('p')
+                p1.innerHTML = `X: ${data.player1}`
+                const p2 = document.createElement('p')
+                p2.innerHTML = `O: ${data.player2}`
+                const p3 = document.createElement('p')
+                p3.innerHTML = `Current player: ${data.currentPlayer}`
+                item.appendChild(p1)
+                item.appendChild(p2)
+                item.appendChild(p3)
+
+                item.appendChild(board);
+                messages.appendChild(item);
+
+                const buttons = document.querySelectorAll('#board' + data.id + ' button')
+                buttons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        socket.emit('tris move', { id: data.id, move: button.id });
+                    });
+                });
+
+
+
+            }
+        });
+
+        socket.on('create activity', (data) => {
+            const item = document.createElement('li');
+            item.textContent = `${data.user} ${data.type} the activity button`;
+            item.classList = 'list-group-item text-center text-info';
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
 
         socket.on('chat message', (result) => {
             if (result.channel === currentChannel) {
@@ -247,7 +401,7 @@
                     const audio = new Audio('/windowsding.mp3');
                     audio.play();
 
-                    if (Notification.permission === 'granted') {
+                    if (Notification.permission === 'granted' && window.document.hasFocus() === false) {
                         new Notification('You were mentioned', {
                             body: result.msgRaw,
 
@@ -256,7 +410,7 @@
                             item.scrollIntoView({ behavior: 'smooth' });
                             for (let i = 0; i < 100; i++) {
                                 setTimeout(() => {
-                                   item.style.backgroundColor = `rgba(0, 25, 100, ${i / 100})`;
+                                    item.style.backgroundColor = `rgba(0, 25, 100, ${i / 100})`;
                                     if (i == 99) {
                                         for (let i = 0; i < 100; i++) {
                                             setTimeout(() => {

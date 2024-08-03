@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const logger = require('morgan');
+const { type } = require('os');
 const markdown = require('markdown-it')();
 
 const app = express();
@@ -27,6 +28,8 @@ const MESSAGE_LIMIT = 5;
 const TIME_FRAME = 5000;
 
 let messageCount = {};
+
+const activities = [];
 
 io.on('connection', (socket) => {
     let currentChannel = 'general';
@@ -105,6 +108,37 @@ io.on('connection', (socket) => {
         usersTyping[currentChannel] = usersTyping[currentChannel].filter(id => id !== socket.id);
         socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
     });
+
+    socket.on('create activity', (data) => {
+       if (data.type == "tris") {
+        const activity = {
+            player1: socket.id,
+            player2: data.user,
+            type: data.type,
+            channel: currentChannel,
+            board: [['', '', ''], ['', '', ''], ['', '', '']],
+            currentPlayer: "X",
+            win: false, 
+            draw: false,
+            startTime: Date.now(),
+            id: Math.floor(Math.random() * 1000000)
+        }
+        activities.push(activity);
+        socket.emit('set input', "");
+        io.to(currentChannel).emit('activity created', activity);
+       }
+    })
+
+    socket.on('tris move', (data) => {
+        //data:  { id: data.id, move: button.id }
+        const activity = activities.find(activity => activity.id == data.id);
+        if (!activity) {
+            return socket.emit('system message', { msg: 'Activity not found', type: 'danger' });
+        }
+        if (activity.player1 !== socket.id && activity.player2 !== socket.id) {
+            return socket.emit('system message', { msg: 'You are not a player', type: 'danger' });
+        }
+    })
 });
 
 function updateChannelsAndUsers() {
