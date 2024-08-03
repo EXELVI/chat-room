@@ -134,6 +134,10 @@
 
         });
 
+        socket.on('set input', (data) => {
+            input.value = data;
+        });
+
         input.addEventListener('input', (e) => {
             socket.emit('typing', { channel: currentChannel, user: socket.id });
 
@@ -186,7 +190,7 @@
                 const item = document.createElement('li');
                 const strong = document.createElement('strong');
                 strong.textContent = result.user;
-                console.log(result);
+                console.debug(result);
                 item.appendChild(strong);
                 item.innerHTML += `${result.msg}`;
                 item.classList = 'list-group-item';
@@ -243,6 +247,29 @@
                     const audio = new Audio('/windowsding.mp3');
                     audio.play();
 
+                    if (Notification.permission === 'granted') {
+                        new Notification('You were mentioned', {
+                            body: result.msgRaw,
+
+                        }).onclick = () => {
+                            window.focus();
+                            item.scrollIntoView({ behavior: 'smooth' });
+                            for (let i = 0; i < 100; i++) {
+                                setTimeout(() => {
+                                   item.style.backgroundColor = `rgba(0, 25, 100, ${i / 100})`;
+                                    if (i == 99) {
+                                        for (let i = 0; i < 100; i++) {
+                                            setTimeout(() => {
+                                                item.style.backgroundColor = `rgba(0, 25, 100, ${1 - i / 100})`;
+                                            }, i * 10);
+                                        }
+                                    }
+                                }, i * 10);
+                            }
+                            console.log("Clicked");
+                        };
+                    }
+
                 }
 
                 messages.appendChild(item);
@@ -261,6 +288,7 @@
 
         socket.on('disconnect', () => {
             const item = document.createElement('li');
+            console.log('%c Connection lost', 'color: red; font-weight: bold; font-size: 24px;');
             item.textContent = 'Connection lost';
             item.classList = 'list-group-item text-center text-danger';
             messages.appendChild(item);
@@ -269,6 +297,7 @@
 
         socket.on('connect', () => {
             const item = document.createElement('li');
+            console.log('%c Connection established', 'color: green; font-weight: bold; font-size: 24px;');
             item.textContent = 'Connection established';
             item.classList = 'list-group-item text-center text-success';
             messages.appendChild(item);
@@ -279,7 +308,6 @@
 
         socket.on('update channels', (channels) => {
             channelList.innerHTML = '';
-            console.log(channels);
             channels.forEach(channel => {
                 //{ name: 'general', users: 5}
                 const item = document.createElement('li');
@@ -380,6 +408,11 @@
             changeTheme();
         });
 
+        window.addEventListener('load', () => {
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission();
+            }
+        });
 
 
     </script>

@@ -67,6 +67,7 @@ io.on('connection', (socket) => {
         messageCount[user] = messageCount[user].filter(timestamp => currentTime - timestamp < TIME_FRAME);
         if (messageCount[user].length > MESSAGE_LIMIT) {
             socket.emit('system message', { msg: 'You are sending messages too quickly', type: 'danger' });
+            socket.emit('set input', msg);
             return;
         }
 
@@ -89,6 +90,7 @@ io.on('connection', (socket) => {
             socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
         }
     });
+
 
     socket.on('typing', () => {
         usersTyping[currentChannel] = usersTyping[currentChannel] || [];
@@ -121,3 +123,19 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+process.on('SIGINT', () => {
+    console.log('Shutting down server');
+    io.emit('system message', { msg: 'Server shutting down', type: 'danger' });
+    server.close();
+    process.exit();
+});
+
+process.on('uncaughtException', (err) => {
+    console.log('Uncaught exception', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('Unhandled rejection', reason);
+});
+
