@@ -7,16 +7,37 @@
     <title>Chat Room</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 
 <body>
+    <!-- dark mode button, top right corner -->
+    <div class="position-absolute top-0 end-0 m-2">
+        <button id="darkMode" class="btn btn-dark">Dark</button>
+    </div>
     <div class="container">
         <div class="row">
             <div class="col-12">
                 <h1 class="text-center">Chat Room</h1>
+                <div class="input-group mb-3">
+                    <label class="input-group-text" for="channelSelect">Channels</label>
+                    <select class="form-select" id="channelSelect">
+                        <option value="general" selected>General</option>
+                    </select>
+                </div>
+                <div class="input-group mb-3">
+                    <input id="newChannel" type="text" class="form-control" placeholder="Create new channel">
+                    <button class="btn btn-secondary" id="createChannel">Create</button>
+                </div>
+                <div id="usersList" class="mb-3">
+                    <h5>Active Users:</h5>
+                    <ul id="activeUsers" class="list-group">
+                    </ul>
+                </div>
                 <ul id="messages" class="list-group list-group-flush mt-3">
                 </ul>
                 <form id="form" class="mt-3">
+                    <small class="text-muted" id="typing"></small>
                     <div class="input-group">
                         <input id="input" type="text" class="form-control" placeholder="Type your message here...">
                         <button class="btn btn-primary">Send</button>
@@ -25,63 +46,159 @@
             </div>
         </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            const socket = io();
 
-        const form = document.getElementById('form');
-        const input = document.getElementById('input');
-        const messages = document.getElementById('messages');
+            const form = document.getElementById('form');
+            const input = document.getElementById('input');
+            const messages = document.getElementById('messages');
+            const channelSelect = document.getElementById('channelSelect');
+            const newChannelInput = document.getElementById('newChannel');
+            const createChannelButton = document.getElementById('createChannel');
+            const activeUsers = document.getElementById('activeUsers');
 
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (input.value) {
-                socket.emit('chat message',  input.value );
-                input.value = '';
+            let currentChannel = 'general';
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (input.value) {
+                    socket.emit('chat message', { channel: currentChannel, msg: input.value });
+                    input.value = '';
+                }
+            });
+
+            createChannelButton.addEventListener('click', () => {
+                const newChannel = newChannelInput.value.trim();
+                if (newChannel) {
+                    socket.emit('create channel', newChannel);
+                    newChannelInput.value = '';
+                }
+            });
+
+            channelSelect.addEventListener('change', (e) => {
+                currentChannel = e.target.value;
+                messages.innerHTML = ''; // Clear messages when switching channels
+                activeUsers.innerHTML = ''; // Clear active users list
+                socket.emit('join channel', currentChannel);
+            });
+
+            input.addEventListener('input', () => {
+                socket.emit('typing', { channel: currentChannel, user: socket.id });
+            });
+
+            socket.on('typing', (data) => {
+                document.getElementById('typing').textContent = `${data} is typing...`;
+            });
+
+            input.addEventListener('blur', () => {
+                socket.emit('stop typing', { channel: currentChannel, user: socket.id });
+            });
+
+            socket.on('stop typing', () => {
+                document.getElementById('typing').textContent = '';
+            });
+
+            socket.on('chat message', (result) => {
+                if (result.channel === currentChannel) {
+                    const item = document.createElement('li');
+                    const strong = document.createElement('strong');
+                    strong.textContent = result.user;
+                    item.appendChild(strong);
+                    item.appendChild(document.createTextNode(`: ${result.msg}`));
+                    item.classList = 'list-group-item';
+                    messages.appendChild(item);
+                    window.scrollTo(0, document.body.scrollHeight);
+                }
+            });
+
+            socket.on('system message', (msg) => {
+                const item = document.createElement('li');
+                item.textContent = msg;
+                item.classList = 'list-group-item text-center text-primary';
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+
+            socket.on('disconnect', () => {
+                const item = document.createElement('li');
+                item.textContent = 'Connection lost';
+                item.classList = 'list-group-item text-center text-danger';
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+
+            socket.on('connect', () => {
+                const item = document.createElement('li');
+                item.textContent = 'Connection established';
+                item.classList = 'list-group-item text-center text-success';
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+                socket.emit('join channel', currentChannel);
+
+            });
+
+            socket.on('update channels', (channels) => {
+                channelSelect.innerHTML = '';
+                channels.forEach(channel => {
+                    const option = document.createElement('option');
+                    option.value = channel;
+                    option.textContent = channel;
+                    channelSelect.appendChild(option);
+                });
+                channelSelect.value = currentChannel;
+            });
+
+            socket.on('update users', (users) => {
+                activeUsers.innerHTML = '';
+                users.forEach(user => {
+                    const item = document.createElement('li');
+                    item.textContent = user;
+                    item.classList = 'list-group-item';
+                    activeUsers.appendChild(item);
+                });
+            });
+
+            function changeTheme(theme) {
+                var themeButton = document.getElementById('darkMode');
+                if (!theme) {
+                    var temaaaStorage = localStorage.getItem('theme');
+                    if (temaaaStorage != "dark") {
+                        document.body.setAttribute('data-bs-theme', "dark");
+                        localStorage.setItem('theme', "dark");
+                        themeButton.innerHTML = "<div><i class=\"bi bi-sun-fill\"></i></div>";
+                        themeButton.classList = "btn btn-light";
+                    }
+                    else {
+                        document.body.setAttribute('data-bs-theme', "light");
+                        localStorage.setItem('theme', "light")
+                        themeButton.innerHTML = "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
+                        themeButton.classList = "btn btn-dark";
+                    }
+                } else if (theme === 'dark' || theme === 'light') {
+                    document.body.setAttribute('data-bs-theme', theme);
+                    localStorage.setItem('theme', theme);
+                    themeButton.innerHTML = theme === 'dark' ? "<div><i class=\"bi bi-sun-fill\"></i></div>" : "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
+                    themeButton.classList = theme === 'dark' ? "btn btn-light" : "btn btn-dark";
+                }
+                for (let i = 0; i < 360; i++) {
+                    setTimeout(() => {
+                        document.querySelector('#darkMode div').style.transform = `rotate(${i}deg)`;
+                    }, i * 1);
+                }
             }
-        });
 
-        socket.on('chat message', (result) => {
-            
-            const item = document.createElement('li');
-            const strong = document.createElement('strong');
-            strong.textContent = result.user;
-            item.appendChild(strong);
-            item.appendChild(document.createTextNode(`: ${result.msg}`));
-            item.classList = 'list-group-item';
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
+            const theme = localStorage.getItem('theme');
+            changeTheme(theme);
 
-        socket.on('system message', (msg) => {
-            const item = document.createElement('li');
-            item.textContent = msg;
-            item.classList = 'list-group-item text-center text-primary';
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
+            document.getElementById('darkMode').addEventListener('click', () => {
+                changeTheme();
+            });
 
-        socket.on('disconnect', () => {
-            const item = document.createElement('li');
-            item.textContent = 'Connection lost';
-            item.classList = 'list-group-item text-center text-danger';
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
-
-        socket.on('connect', () => {
-            const item = document.createElement('li');
-            item.textContent = 'Connection established';
-            item.classList = 'list-group-item text-center text-success';
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
-
-
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-        crossorigin="anonymous"></script>
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+            crossorigin="anonymous"></script>
 </body>
 
 </html>

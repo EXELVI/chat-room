@@ -16,24 +16,64 @@ app.use(logger('dev'));
 
 app.get('/', (req, res) => {
     res.render('index');
-})
+});
 
-
+const channels = { general: [], random: [], tech: [] };
 
 io.on('connection', (socket) => {
-    io.emit('system message', '+ User connected');
-    socket.on('chat message', (msg) => {
-        var user = socket.id;
-        io.emit('chat message', { msg: msg, user });
+    let currentChannel = 'general';
+    socket.join(currentChannel);
+    channels[currentChannel].push(socket.id);
+    updateChannelsAndUsers();
+    io.to(currentChannel).emit('system message', '+ User ' + socket.id + ' connected');
+
+    socket.on('join channel', (channel) => {
+        socket.leave(currentChannel);
+        channels[currentChannel] = channels[currentChannel].filter(id => id !== socket.id);
+        io.to(currentChannel).emit('system message', `- User ${socket.id} left channel ${currentChannel}`);
+        currentChannel = channel;
+        socket.join(currentChannel);
+        channels[currentChannel].push(socket.id);
+        updateChannelsAndUsers();
+        io.to(currentChannel).emit('system message', `+ User ${socket.id} joined channel ${currentChannel}`);
+    });
+
+    socket.on('create channel', (newChannel) => {
+        if (!channels[newChannel]) {
+            channels[newChannel] = [];
+            updateChannelsAndUsers();
+        }
+    });
+
+    socket.on('chat message', (data) => {
+        const { channel, msg } = data;
+        const user = socket.id;
+        io.to(channel).emit('chat message', { channel, msg, user });
+        io.to(channel).emit('stop typing', socket.id);
     });
 
     socket.on('disconnect', () => {
-        console.log('- User disconnected');
-        io.emit('system message', 'User disconnected');
+        channels[currentChannel] = channels[currentChannel].filter(id => id !== socket.id);
+        updateChannelsAndUsers();
+        io.to(currentChannel).emit('system message', '- User ' + socket.id + ' disconnected');
+    });
+
+    socket.on('typing', () => {
+        socket.broadcast.to(currentChannel).emit('typing', socket.id);
+    });
+
+    socket.on('stop typing', () => {
+        socket.broadcast.to(currentChannel).emit('stop typing', socket.id);
     });
 });
 
-
+function updateChannelsAndUsers() {
+    const channelNames = Object.keys(channels);
+    io.emit('update channels', channelNames);
+    channelNames.forEach(channel => {
+        io.to(channel).emit('update users', channels[channel]);
+    });
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
