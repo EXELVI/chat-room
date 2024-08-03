@@ -133,14 +133,12 @@
                 }
             }
 
-            if (e.key === 'ArrowUp') {
+            if (e.key === 'ArrowUp' && input.value === '') {
                 e.preventDefault();
 
                 if (lastMessage) {
                     input.value = lastMessage;
                 }
-
-
             }
 
         });
@@ -253,34 +251,7 @@
         }
 
 
-        function checkDraw(board) {
-            for (let i = 0; i < 3; i++) {
-                for (let j = 0; j < 3; j++) {
-                    if (board[i][j] === '') {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
 
-        function checkWin(board, player) {
-            for (let i = 0; i < 3; i++) {
-                if (board[i][0] === player && board[i][1] === player && board[i][2] === player) {
-                    return true;
-                }
-                if (board[0][i] === player && board[1][i] === player && board[2][i] === player) {
-                    return true;
-                }
-            }
-            if (board[0][0] === player && board[1][1] === player && board[2][2] === player) {
-                return true;
-            }
-            if (board[0][2] === player && board[1][1] === player && board[2][0] === player) {
-                return true;
-            }
-            return false;
-        }
 
         socket.on("activity created", (data) => {
             if (data.type == "tris") {
@@ -313,7 +284,7 @@
                 p3.innerHTML = `Current player: ${data.currentPlayer}`
                 item.appendChild(p1)
                 item.appendChild(p2)
-                item.appendChild(p3)
+                board.appendChild(p3)
 
                 item.appendChild(board);
                 messages.appendChild(item);
@@ -324,11 +295,60 @@
                         socket.emit('tris move', { id: data.id, move: button.id });
                     });
                 });
-
-
-
             }
         });
+
+
+        socket.on("activity update", (activity) => {
+            if (activity.type == "tris") {
+                const board = document.getElementById('board' + activity.id)
+                if (!board) return
+                board.innerHTML = getButtons(activity.board, activity.win || activity.draw).innerHTML
+                const p3 = document.createElement('p')
+                p3.innerHTML = `Current player: ${activity.currentPlayer}`
+                board.appendChild(p3)
+                if (activity.win) {
+                    const p4 = document.createElement('h3')
+                    p4.innerHTML = `Winner: ${activity.currentPlayer}`
+                    board.appendChild(p4)
+                }
+                if (activity.draw) {
+                    const p4 = document.createElement('h3')
+                    p4.innerHTML = `Draw`
+                    board.appendChild(p4)
+                }
+
+                const buttons = document.querySelectorAll('#board' + activity.id + ' button')
+                buttons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        socket.emit('tris move', { id: activity.id, move: button.id });
+                    });
+                });
+            }
+        });
+
+        socket.on("activity stop", activity => {
+            if (activity.type == "tris") {
+                const board = document.getElementById('board' + activity.id)
+                if (!board) return
+                board.innerHTML = getButtons(activity.board, true).innerHTML
+                const p3 = document.createElement('p')
+                p3.innerHTML = `Current player: ${activity.currentPlayer}`
+                board.appendChild(p3)
+                if (activity.win) {
+                    const p4 = document.createElement('h3')
+                    p4.innerHTML = `Winner: ${activity.currentPlayer}`
+                    board.appendChild(p4)
+                }
+                if (activity.draw) {
+                    const p4 = document.createElement('h3')
+                    p4.innerHTML = `Draw`
+                    board.appendChild(p4)
+                }
+            }
+        });
+
+
 
         socket.on('create activity', (data) => {
             const item = document.createElement('li');

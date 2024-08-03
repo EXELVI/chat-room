@@ -31,6 +31,37 @@ let messageCount = {};
 
 const activities = [];
 
+
+//TicTacToe/Tris
+function checkDraw(board) {
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            if (board[i][j] === '') {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function checkWin(board, player) {
+    for (let i = 0; i < 3; i++) {
+        if (board[i][0] === player && board[i][1] === player && board[i][2] === player) {
+            return true;
+        }
+        if (board[0][i] === player && board[1][i] === player && board[2][i] === player) {
+            return true;
+        }
+    }
+    if (board[0][0] === player && board[1][1] === player && board[2][2] === player) {
+        return true;
+    }
+    if (board[0][2] === player && board[1][1] === player && board[2][0] === player) {
+        return true;
+    }
+    return false;
+}
+
 io.on('connection', (socket) => {
     let currentChannel = 'general';
     socket.join(currentChannel);
@@ -92,6 +123,11 @@ io.on('connection', (socket) => {
             usersTyping[currentChannel] = usersTyping[currentChannel].filter(id => id !== socket.id);
             socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
         }
+        var activity = activities.find(activity => activity.player1 === socket.id || activity.player2 === socket.id);
+        if (activity) {
+            io.to(currentChannel).emit('activity stop', activity);
+            activities.splice(activities.indexOf(activity), 1); 
+        }
     });
 
 
@@ -130,7 +166,6 @@ io.on('connection', (socket) => {
     })
 
     socket.on('tris move', (data) => {
-        //data:  { id: data.id, move: button.id }
         const activity = activities.find(activity => activity.id == data.id);
         if (!activity) {
             return socket.emit('system message', { msg: 'Activity not found', type: 'danger' });
@@ -138,6 +173,28 @@ io.on('connection', (socket) => {
         if (activity.player1 !== socket.id && activity.player2 !== socket.id) {
             return socket.emit('system message', { msg: 'You are not a player', type: 'danger' });
         }
+        if (activity.currentPlayer !== "X" && activity.player1 === socket.id) {
+            return socket.emit('system message', { msg: 'Not your turn', type: 'danger' });
+        }
+        if (activity.currentPlayer !== "O" && activity.player2 === socket.id) {
+            return socket.emit('system message', { msg: 'Not your turn', type: 'danger' });
+        }
+        var col = data.move % 3,
+        row = Math.floor(data.move / 3);
+        if (activity.board[row][col] !== "") {
+            return socket.emit('system message', { msg: 'Invalid move', type: 'danger' });
+        }
+        activity.board[row][col] = activity.currentPlayer;
+        if (checkWin(activity.board, activity.currentPlayer)) {
+            activity.win = true;
+            return io.to(currentChannel).emit('activity update', activity);
+        }
+        if (checkDraw(activity.board)) {
+            activity.draw = true;
+            return io.to(currentChannel).emit('activity update', activity);
+        }
+        activity.currentPlayer = activity.currentPlayer === "X" ? "O" : "X";
+        io.to(currentChannel).emit('activity update', activity);      
     })
 });
 
