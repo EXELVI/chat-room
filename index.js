@@ -162,6 +162,21 @@ io.on('connection', (socket) => {
         activities.push(activity);
         socket.emit('set input', "");
         io.to(currentChannel).emit('activity created', activity);
+       } else if (data.type == "rock-paper-scissors") {
+        const activity = {
+            player1: socket.id,
+            player2: data.user,
+            type: data.type,
+            channel: currentChannel,
+            startTime: Date.now(),
+            id: Math.floor(Math.random() * 1000000),
+            player1Move: "",
+            player2Move: ""
+        }
+        activities.push(activity);
+        socket.emit('set input', "");
+        io.to(currentChannel).emit('activity created', activity);
+
        }
     })
 
@@ -196,7 +211,35 @@ io.on('connection', (socket) => {
         activity.currentPlayer = activity.currentPlayer === "X" ? "O" : "X";
         io.to(currentChannel).emit('activity update', activity);      
     })
+    
+//socket.emit('rock-paper-scissors move', { id: data.id, move: button.id });
+
+    socket.on('rock-paper-scissors move', (data) => {
+        const activity = activities.find(activity => activity.id == data.id);
+        if (!activity) {
+            return socket.emit('system message', { msg: 'Activity not found', type: 'danger' });
+        }
+        if (activity.player1 !== socket.id && activity.player2 !== socket.id) {
+            return socket.emit('system message', { msg: 'You are not a player', type: 'danger' });
+        }
+
+        if (activity.player1 === socket.id && activity.player1Move !== "") {
+            return socket.emit('system message', { msg: 'You already made a move', type: 'danger' });
+        }
+        if (activity.player2 === socket.id && activity.player2Move !== "") {
+            return socket.emit('system message', { msg: 'You already made a move', type: 'danger' });
+        }
+
+        if (activity.player1 === socket.id) {
+            activity.player1Move = data.move;
+        } else {
+            activity.player2Move = data.move;
+        }
+      
+        io.to(currentChannel).emit('activity update', activity);
+    })
 });
+
 
 function updateChannelsAndUsers() {
     const channelNames = Object.keys(channels);

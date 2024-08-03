@@ -60,7 +60,8 @@
                                 class="bi bi-triangle"></i></button>
                         <ul class="dropdown-menu" aria-labelledby="activity">
                             <li>
-                                <button class="btn btn-secondary dropdown-item" type="button" id="tris">Tris</button>
+                                <button class="btn btn-secondary dropdown-item" type="button"
+                                    id="tris">Tic-Tac-Toe</button>
                             </li>
                             <li>
                                 <button class="btn btn-secondary dropdown-item" type="button"
@@ -93,7 +94,6 @@
             e.preventDefault();
             if (input.value) {
                 socket.emit('chat message', { channel: currentChannel, msg: input.value });
-
                 input.value = '';
             }
         });
@@ -339,6 +339,67 @@
                         socket.emit('tris move', { id: data.id, move: button.id });
                     });
                 });
+            } else if (data.type = "rock-paper-scissors") {
+                /* activity: {
+                 player1: socket.id,
+                 player2: data.user,
+                 type: data.type,
+                 channel: currentChannel,
+                 startTime: Date.now(),
+                 id: Math.floor(Math.random() * 1000000),
+                 player1Move: "",
+                 player2Move: ""
+             }*/
+                const item = document.createElement('li');
+                item.classList = 'list-group-item text-center';
+                const board = document.createElement('div');
+                board.id = 'board' + data.id
+                item.appendChild(document.createTextNode(`${data.player1} started a rock-paper-scissors game with ${data.player2}`))
+                const p1 = document.createElement('p')
+                p1.innerHTML = `Player 1: ${data.player1}`
+                const p2 = document.createElement('p')
+                p2.innerHTML = `Player 2: ${data.player2}`
+                item.appendChild(p1)
+                item.appendChild(p2)
+
+                const rock = document.createElement('button')
+                rock.type = 'button'
+                rock.id = 'rock'
+                rock.className = 'btn btn-primary m-1'
+                rock.innerText = 'Rock'
+                rock.disabled = false
+                board.appendChild(rock)
+
+                const paper = document.createElement('button')
+                paper.type = 'button'
+                paper.id = 'paper'
+                paper.className = 'btn btn-primary m-1'
+                paper.innerText = 'Paper'
+                paper.disabled = false
+                board.appendChild(paper)
+
+                const scissors = document.createElement('button')
+                scissors.type = 'button'
+                scissors.id = 'scissors'
+                scissors.className = 'btn btn-primary m-1'
+                scissors.innerText = 'Scissors'
+                scissors.disabled = false
+                board.appendChild(scissors)
+
+                //player turn
+                const p3 = document.createElement('p')
+                p3.innerHTML = `Waiting for ${data.player1move ? data.player2 : data.player1} ${data.player2move ? '' : 'and ' + data.player2} to make a move`
+                board.appendChild(p3)
+
+                item.appendChild(board);
+                messages.appendChild(item);
+
+                const buttons = document.querySelectorAll('#board' + data.id + ' button')
+                buttons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        socket.emit('rock-paper-scissors move', { id: data.id, move: button.id });
+                    });
+                });
             }
         });
 
@@ -355,11 +416,21 @@
                     const p4 = document.createElement('h3')
                     p4.innerHTML = `Winner: ${activity.currentPlayer}`
                     board.appendChild(p4)
+                    const p5 = document.createElement('p')
+                    const duration = Math.floor((Date.now() - activity.startTime) / 1000)
+                    const durationParsed = duration > 60 ? `${Math.floor(duration / 60)} minutes and ${duration % 60} seconds` : `${duration} seconds`
+                    p5.innerHTML = `Duration: ${durationParsed}`
+                    board.appendChild(p5)
                 }
                 if (activity.draw) {
                     const p4 = document.createElement('h3')
                     p4.innerHTML = `Draw`
                     board.appendChild(p4)
+                    const p5 = document.createElement('p')
+                    const duration = Math.floor((Date.now() - activity.startTime) / 1000)
+                    const durationParsed = duration > 60 ? `${Math.floor(duration / 60)} minutes and ${duration % 60} seconds` : `${duration} seconds`
+                    p5.innerHTML = `Duration: ${durationParsed}`
+                    board.appendChild(p5)
                 }
 
                 const buttons = document.querySelectorAll('#board' + activity.id + ' button')
@@ -368,6 +439,32 @@
                         socket.emit('tris move', { id: activity.id, move: button.id });
                     });
                 });
+            } else if (activity.type == "rock-paper-scissors") {
+
+                const board = document.getElementById('board' + activity.id)
+                if (!board) return
+                const currentPlayer = activity.player1Move ? activity.player2 : activity.player1
+                board.querySelector('p').innerHTML = `Waiting for ${currentPlayer} to make a move`
+                if (activity.player1Move && activity.player2Move) {
+                    const p4 = document.createElement('h3')
+                    if (activity.player1Move == activity.player2Move) {
+                        p4.innerHTML = `Draw`
+                    } else if (activity.player1Move == 'rock' && activity.player2Move == 'scissors' || activity.player1Move == 'scissors' && activity.player2Move == 'paper' || activity.player1Move == 'paper' && activity.player2Move == 'rock') {
+                        p4.innerHTML = `Winner: ${activity.player1}`
+                    } else {
+                        p4.innerHTML = `Winner: ${activity.player2}`
+                    }
+                    board.appendChild(p4)
+                    const duration = Math.floor((Date.now() - activity.startTime) / 1000)
+                    const durationParsed = duration > 60 ? `${Math.floor(duration / 60)} minutes and ${duration % 60} seconds` : `${duration} seconds`
+                    board.querySelector('p').innerHTML = `Duration: ${durationParsed}`
+               
+                    const buttons = document.querySelectorAll('#board' + activity.id + ' button')
+                    buttons.forEach(button => {
+                        button.disabled = true
+                    });
+
+                }           
             }
         });
 
@@ -389,17 +486,27 @@
                     p4.innerHTML = `Draw`
                     board.appendChild(p4)
                 }
+            } else if (activity.type == "rock-paper-scissors") {
+                const board = document.getElementById('board' + activity.id)
+                if (!board) return
+                const currentPlayer = activity.player1Move ? activity.player2 : activity.player1
+                board.querySelector('p').innerHTML = `Waiting for ${currentPlayer} to make a move`
+                if (activity.player1Move && activity.player2Move) {
+                    const p4 = document.createElement('h3')
+                    if (activity.player1Move == activity.player2Move) {
+                        p4.innerHTML = `Draw`
+                    } else if (activity.player1Move == 'rock' && activity.player2Move == 'scissors' || activity.player1Move == 'scissors' && activity.player2Move == 'paper' || activity.player1Move == 'paper' && activity.player2Move == 'rock') {
+                        p4.innerHTML = `Winner: ${activity.player1}`
+                    } else {
+                        p4.innerHTML = `Winner: ${activity.player2}`
+                    }
+                    board.appendChild(p4)
+                }
+                const buttons = document.querySelectorAll('#board' + activity.id + ' button')
+                buttons.forEach(button => {
+                    button.disabled = true
+                });
             }
-        });
-
-
-
-        socket.on('create activity', (data) => {
-            const item = document.createElement('li');
-            item.textContent = `${data.user} ${data.type} the activity button`;
-            item.classList = 'list-group-item text-center text-info';
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
         });
 
 
@@ -479,10 +586,10 @@
                                         for (let i = 0; i < 100; i++) {
                                             setTimeout(() => {
                                                 item.style.backgroundColor = `rgba(0, 25, 100, ${1 - i / 100})`;
-                                            }, i * 10);
+                                            }, i * 6);
                                         }
                                     }
-                                }, i * 10);
+                                }, i * 6);
                             }
                             console.log("Clicked");
                         };
