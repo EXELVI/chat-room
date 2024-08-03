@@ -21,6 +21,8 @@ app.get('/', (req, res) => {
 
 const channels = { general: [], random: [], tech: [] };
 
+var usersTyping = {};
+
 io.on('connection', (socket) => {
     let currentChannel = 'general';
     socket.join(currentChannel);
@@ -50,21 +52,36 @@ io.on('connection', (socket) => {
         const { channel, msg } = data;
         const user = socket.id;
         io.to(channel).emit('chat message', { channel, user, msg: markdown.render(msg), msgRaw: msg });
-        io.to(channel).emit('stop typing', socket.id);
+        if (usersTyping[channel]) {
+            usersTyping[channel] = usersTyping[channel].filter(id => id !== socket.id);
+            socket.broadcast.to(channel).emit('typing', usersTyping[channel]);
+        }
+
+
     });
 
     socket.on('disconnect', () => {
         channels[currentChannel] = channels[currentChannel].filter(id => id !== socket.id);
         updateChannelsAndUsers();
         io.to(currentChannel).emit('system message', '- User ' + socket.id + ' disconnected');
+        if (usersTyping[currentChannel]) {
+            usersTyping[currentChannel] = usersTyping[currentChannel].filter(id => id !== socket.id);
+            socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
+        }
     });
 
     socket.on('typing', () => {
-        socket.broadcast.to(currentChannel).emit('typing', socket.id);
+        usersTyping[currentChannel] = usersTyping[currentChannel] || [];
+        if (!usersTyping[currentChannel].includes(socket.id)) {
+            usersTyping[currentChannel].push(socket.id);
+        }
+        socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
     });
 
     socket.on('stop typing', () => {
-        socket.broadcast.to(currentChannel).emit('stop typing', socket.id);
+        usersTyping[currentChannel] = usersTyping[currentChannel] || [];
+        usersTyping[currentChannel] = usersTyping[currentChannel].filter(id => id !== socket.id);
+        socket.broadcast.to(currentChannel).emit('typing', usersTyping[currentChannel]);
     });
 });
 

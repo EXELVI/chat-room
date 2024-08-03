@@ -87,6 +87,8 @@
             socket.emit('join channel', currentChannel);
         });
 
+        var suggestions = [];
+
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -96,6 +98,25 @@
                 input.rows = input.value.split('\n').length
             }, 1);
 
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                var split = input.value.split(' ');
+                var cursor = input.selectionStart;
+                if (split[split.length - 1].startsWith('@')) {
+                    if (suggestions.length > 0) {
+                        var index = suggestions.indexOf(split[split.length - 1].substring(1));
+                        index++;
+
+                        if (index >= suggestions.length || index < 0) {
+                            index = 0;
+                        }
+                        split[split.length - 1] = '@' + suggestions[index];
+                        input.value = split.join(' ');
+                        input.setSelectionRange(cursor, input.value.length);
+                    }
+                }
+            }
+
         });
 
         input.addEventListener('input', (e) => {
@@ -104,9 +125,16 @@
             var split = input.value.split(' ');
             var cursor = input.selectionStart;
             if (split[split.length - 1].startsWith('@')) {
-                var users = document.querySelectorAll('#activeUsers li');
+                suggestions = [];
+                var usersLi = document.querySelectorAll('#activeUsers li');
+                var users = [];
+                usersLi.forEach(u => {
+                    const li = document.createElement('li');
+                    li.innerText = u.textContent.replace(' (You)', '');
+                    users.push(li);
+                });
                 var user = split[split.length - 1].substring(1);
-                var suggestions = [];
+
                 users.forEach(u => {
                     if (u.textContent.startsWith(user)) {
                         suggestions.push(u.textContent);
@@ -123,16 +151,20 @@
         });
 
         socket.on('typing', (data) => {
-            document.getElementById('typing').textContent = `${data} is typing...`;
+            const typing = document.getElementById('typing');
+            data = data.filter(user => user !== socket.id);
+            if (data.length > 0) {
+                typing.textContent = `${data.join(', ')} ${data.length > 1 ? 'are' : 'is'} typing...`;
+            } else {
+                typing.textContent = '';
+            }
+
         });
 
         input.addEventListener('blur', () => {
             socket.emit('stop typing', { channel: currentChannel, user: socket.id });
         });
 
-        socket.on('stop typing', () => {
-            document.getElementById('typing').textContent = '';
-        });
 
         socket.on('chat message', (result) => {
             if (result.channel === currentChannel) {
@@ -142,6 +174,9 @@
                 console.log(result);
                 item.appendChild(strong);
                 item.innerHTML += `${result.msg}`;
+                item.classList = 'list-group-item';
+                const mention = new RegExp(`@${socket.id}`, 'g');
+
 
                 item.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
@@ -180,7 +215,17 @@
                 });
 
 
-                item.classList = 'list-group-item';
+                if (mention.test(result.msg)) {
+                    const alert = document.createElement('div');
+                    alert.classList = 'alert alert-warning';
+                    alert.innerHTML = item.innerHTML;
+                    item.innerHTML = '';
+                    item.appendChild(alert);
+                    const audio = new Audio('/windowsding.mp3');
+                    audio.play();
+
+                }
+
                 messages.appendChild(item);
                 Prism.highlightAll();
                 window.scrollTo(0, document.body.scrollHeight);
@@ -228,8 +273,39 @@
             activeUsers.innerHTML = '';
             users.forEach(user => {
                 const item = document.createElement('li');
-                item.textContent = user;
                 item.classList = 'list-group-item';
+                if (user === socket.id) {
+                    item.innerHTML = `<strong>${user}</strong> (You)`;
+                } else {
+                    item.textContent = user;
+                }
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    const contextMenu = document.createElement('div');
+                    contextMenu.classList = 'btn-group';
+                    const buttonMention = document.createElement('button');
+                    buttonMention.classList = 'btn btn-secondary';
+                    buttonMention.textContent = 'Mention';
+                    buttonMention.addEventListener('click', () => {
+                        input.value = `@${user} `;
+                        input.focus();
+                        contextMenu.remove();
+                    });
+                    contextMenu.appendChild(buttonMention);
+                    contextMenu.style.position = 'absolute';
+                    contextMenu.style.top = `${e.pageY}px`;
+                    contextMenu.style.left = `${e.pageX}px`;
+
+                    document.body.appendChild(contextMenu);
+                    document.addEventListener('click', () => {
+                        contextMenu.remove();
+                    }, { once: true });
+                    setTimeout(() => {
+                        document.addEventListener('contextmenu', () => {
+                            contextMenu.remove();
+                        }, { once: true });
+                    }, 10);
+                });
                 activeUsers.appendChild(item);
             });
         });
@@ -241,13 +317,11 @@
                 if (temaaaStorage != "dark") {
                     document.body.setAttribute('data-bs-theme', "dark");
                     localStorage.setItem('theme', "dark");
-                    themeButton.innerHTML = "<div><i class=\"bi bi-sun-fill\"></i></div>";
                     themeButton.classList = "btn btn-light";
                 }
                 else {
                     document.body.setAttribute('data-bs-theme', "light");
                     localStorage.setItem('theme', "light")
-                    themeButton.innerHTML = "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
                     themeButton.classList = "btn btn-dark";
                 }
             } else if (theme === 'dark' || theme === 'light') {
@@ -256,11 +330,7 @@
                 themeButton.innerHTML = theme === 'dark' ? "<div><i class=\"bi bi-sun-fill\"></i></div>" : "<div><i class=\"bi bi-moon-stars-fill\"></i></div>";
                 themeButton.classList = theme === 'dark' ? "btn btn-light" : "btn btn-dark";
             }
-            for (let i = 0; i < 360; i++) {
-                setTimeout(() => {
-                    document.querySelector('#darkMode div').style.transform = `rotate(${i}deg)`;
-                }, i * 1);
-            }
+          
         }
 
         const theme = localStorage.getItem('theme');
