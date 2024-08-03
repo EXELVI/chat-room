@@ -89,6 +89,11 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('file upload', (data) => {
+        data.user = socket.id;
+        io.to(currentChannel).emit('file upload', data);
+    });
+
     socket.on('chat message', (data) => {
         const { channel, msg } = data;
         const user = socket.id;
@@ -100,7 +105,7 @@ io.on('connection', (socket) => {
         const currentTime = Date.now();
         messageCount[user] = messageCount[user].filter(timestamp => currentTime - timestamp < TIME_FRAME);
         if (messageCount[user].length > MESSAGE_LIMIT) {
-            socket.emit('system message', { msg: 'You are sending messages too quickly', type: 'danger' });
+            socket.emit('system message', { msg: 'You are sending messages too quickly', type: 'danger', icon: "exclamation-diamond" });
             socket.emit('set input', msg);
             return;
         }

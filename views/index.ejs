@@ -68,8 +68,14 @@
                                     id="rock-paper-scissors">Rock Paper Scissors</button>
                             </li>
                         </ul>
+
                         <button class="btn btn-primary">Send</button>
                     </div>
+                    <div class="input-group my-1">
+                        <input id="fileInput" type="file" class="form-control" aria-label="Upload file">
+                        <button class="btn btn-secondary" id="uploadFile" disabled>Upload</button>
+                    </div>
+
                 </form>
             </div>
         </div>
@@ -87,6 +93,195 @@
         const newChannelInput = document.getElementById('newChannel');
         const createChannelButton = document.getElementById('createChannel');
         const activeUsers = document.getElementById('activeUsers');
+        const fileInput = document.getElementById('fileInput');
+        const uploadFileButton = document.getElementById('uploadFile');
+
+        uploadFileButton.addEventListener('click', () => {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = () => {
+                    socket.emit('file upload', { channel: currentChannel, file: reader.result, fileName: file.name });
+                    fileInput.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                uploadFileButton.disabled = false;
+            } else {
+                uploadFileButton.disabled = true;
+            }
+
+        });
+
+
+
+        function getFileIcon(fileName) {
+            const ext = fileName.split('.').pop();
+            switch (ext) {
+                case 'doc':
+                case 'docx':
+                    return 'bi-file-earmark-word';
+                case 'xls':
+                case 'xlsx':
+                    return 'bi-file-earmark-excel';
+                case 'ppt':
+                case 'pptx':
+                    return 'bi-filetype-pptx';
+                case 'pdf':
+                    return 'bi-file-earmark-pdf';
+                case 'zip':
+                case 'rar':
+                case '7z':
+                case 'tar':
+                    return 'bi-file-earmark-zip';
+                case 'mp3':
+                case 'wav':
+                case 'flac':
+                case 'ogg':
+                case 'm4a':
+                case 'wma':
+                    return 'bi-file-earmark-music';
+                case 'mp4':
+                case 'mkv':
+                case 'avi':
+                case 'mov':
+                case 'wmv':
+                case 'flv':
+                case 'webm':
+                    return 'bi-file-earmark-play';
+                case 'jpg':
+                case 'jpeg':
+                case 'png':
+                case 'gif':
+                case 'bmp':
+                case 'webp':
+                case 'ico':
+                    return 'bi-file-earmark-image';
+                case 'txt':
+                case 'log':
+                    return 'bi-file-earmark-text';
+                case 'js': //filetype from now
+                    return 'bi-filetype-js';
+                case 'css':
+                    return 'bi-filetype-css';
+                case 'html':
+                    return 'bi-filetype-html';
+                case 'json':
+                    return 'bi-filetype-json';
+                case 'md':
+                    return 'bi-filetype-md';
+                case 'csv':
+                    return 'bi-filetype-csv';
+                case 'sql':
+                    return 'bi-filetype-sql';
+                case 'py':
+                    return 'bi-filetype-py';
+                case 'java':
+                    return 'bi-filetype-java';
+                case 'ai':
+                    return 'bi-filetype-ai';
+                case 'psd':
+                    return 'bi-filetype-psd';
+                case 'svg':
+                    return 'bi-filetype-svg';
+                case 'heic':
+                    return 'bi-filetype-heic';
+                case 'php':
+                    return 'bi-filetype-php';
+                case 'key':
+                    return 'bi-filetype-key';
+                case 'sass':
+                    return 'bi-filetype-sass';
+                case 'mdx':
+                    return 'bi-filetype-mdx';
+                case 'jsx':
+                    return 'bi-filetype-jsx';
+                case 'rb':
+                    return 'bi-filetype-rb';
+                case 'tsx':
+                    return 'bi-filetype-tsx';
+                case 'woff':
+                case 'woff2':
+                    return 'bi-filetype-woff';
+                case 'ttf':
+                    return 'bi-filetype-ttf';
+                case 'otf':
+                    return 'bi-filetype-otf';
+                case 'exe':
+                    return 'bi-filetype-exe';
+                case 'aac':
+                    return 'bi-filetype-aac';
+                case 'raw':
+                    return 'bi-filetype-raw';
+                case 'tiff':
+                    return 'bi-filetype-tiff';
+                case 'yml':
+                case 'yaml':
+                    return 'bi-filetype-yml';
+                case 'xml':
+                case 'c':
+                case 'ts':
+                case 'cpp':
+                case 'h':
+                case 'hpp':
+                case 'go':
+                case 'cs':
+                case 'swift':
+                case 'kt':
+                case 'rs':
+                case 'lua':
+                case 'sh':
+                case 'bat':
+                case 'ps1':
+                case 'cmd':
+                case 'pl':
+                case 'r':
+                case 'm':
+                case 'v':
+                case 'vb':
+                case 'f':              
+                    return 'bi-file-earmark-code';
+                default:
+                    return 'bi-file-earmark';
+            }
+        }
+
+        socket.on('file upload', (data) => {
+            if (data.channel === currentChannel) {
+                const item = document.createElement('li');
+                item.innerHTML = `<strong>${data.user}</strong> uploaded a file: `;
+                item.classList = 'list-group-item';
+                const card = document.createElement('div');
+                card.classList = 'card';
+                const cardBody = document.createElement('div');
+                cardBody.classList = 'card-body';
+                const cardTitle = document.createElement('h5');
+                cardTitle.classList = 'card-title';
+                const i = document.createElement('i');
+                i.classList = `bi ${getFileIcon(data.fileName)}`;
+                cardTitle.appendChild(i);
+                cardTitle.innerHTML += ` ${data.fileName}`;
+                const cardText = document.createElement('p');
+                cardText.classList = 'card-text';
+                cardText.textContent = 'Click to download';
+                const downloadButton = document.createElement('a');
+                downloadButton.href = data.file;
+                downloadButton.download = data.fileName;
+                downloadButton.textContent = 'Download';
+                downloadButton.classList = 'btn btn-primary';
+                cardBody.appendChild(cardTitle);
+                cardBody.appendChild(cardText);
+                cardBody.appendChild(downloadButton);
+                card.appendChild(cardBody);
+                item.appendChild(card);
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+            }
+        });
 
         let currentChannel = 'general';
 
@@ -458,13 +653,13 @@
                     const duration = Math.floor((Date.now() - activity.startTime) / 1000)
                     const durationParsed = duration > 60 ? `${Math.floor(duration / 60)} minutes and ${duration % 60} seconds` : `${duration} seconds`
                     board.querySelector('p').innerHTML = `Duration: ${durationParsed}`
-               
+
                     const buttons = document.querySelectorAll('#board' + activity.id + ' button')
                     buttons.forEach(button => {
                         button.disabled = true
                     });
 
-                }           
+                }
             }
         });
 
@@ -607,6 +802,11 @@
             const item = document.createElement('li');
             item.textContent = data.msg;
             item.classList = 'list-group-item text-center text-' + data.type;
+            if (data.icon) {
+                const icon = document.createElement('i');
+                icon.classList = 'bi ' + data.icon;
+                item.prepend(icon);
+            }
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
         });
