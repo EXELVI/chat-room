@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const logger = require('morgan');
+const markdown = require('markdown-it')();
 
 const app = express();
 const server = http.createServer(app);
@@ -48,7 +49,7 @@ io.on('connection', (socket) => {
     socket.on('chat message', (data) => {
         const { channel, msg } = data;
         const user = socket.id;
-        io.to(channel).emit('chat message', { channel, msg, user });
+        io.to(channel).emit('chat message', { channel, user, msg: markdown.render(msg), msgRaw: msg });
         io.to(channel).emit('stop typing', socket.id);
     });
 
