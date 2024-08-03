@@ -56,7 +56,17 @@
                     <div class="input-group">
                         <textarea id="input" class="form-control" placeholder="Type a message..." rows="1"
                             aria-label="Type a message..." aria-describedby="button-addon2"></textarea>
-                        <button class="btn btn-secondary" id="activityTris"><i class="bi bi-triangle"></i></button>
+                        <button class="btn btn-secondary" aria-expanded="false" id="activity"><i
+                                class="bi bi-triangle"></i></button>
+                        <ul class="dropdown-menu" aria-labelledby="activity">
+                            <li>
+                                <button class="btn btn-secondary dropdown-item" type="button" id="tris">Tris</button>
+                            </li>
+                            <li>
+                                <button class="btn btn-secondary dropdown-item" type="button"
+                                    id="rock-paper-scissors">Rock Paper Scissors</button>
+                            </li>
+                        </ul>
                         <button class="btn btn-primary">Send</button>
                     </div>
                 </form>
@@ -193,11 +203,7 @@
             socket.emit('stop typing', { channel: currentChannel, user: socket.id });
         });
 
-        document.getElementById('activityTris').addEventListener('click', (e) => {
-            e.preventDefault();
-            // if input has a valid user mention in active users, send activity
-            var split = input.value.split(' ');
-            var user = split[split.length - 1].substring(1);
+        function checkForValidUser(user) {
             var usersLi = document.querySelectorAll('#activeUsers li');
             var users = [];
             usersLi.forEach(u => {
@@ -211,10 +217,55 @@
                     found = true;
                 }
             });
+
+            return found;
+        }
+
+        document.getElementById('activity').addEventListener('click', (e) => {
+            e.preventDefault();
+            // if input has a valid user mention in active users, send activity
+            var split = input.value.split(' ');
+            var user = split[split.length - 1].substring(1);
+            var found = checkForValidUser(user);
             if (found) {
-                socket.emit('create activity', { user: user, type: 'tris' });
+                let dropdownElement = document.getElementById('activity');
+                let dropdown = new bootstrap.Dropdown(dropdownElement, {
+                    boundary: 'viewport',
+                    reference: dropdownElement,
+                    display: 'dynamic'
+                });
+                dropdown.show();
+
+                function createActivity(event) {
+                    const type = event.target.id;
+                    socket.emit('create activity', { type: type, user: user });
+                    dropdown.hide();
+                }
+
+                document.getElementById('tris').addEventListener('click', createActivity, { once: true });
+
+                document.getElementById('rock-paper-scissors').addEventListener('click', createActivity, { once: true });
+
+
+
+                dropdownElement.addEventListener('hidden.bs.dropdown', () => {
+                    dropdown.dispose();
+                    document.getElementById('tris').removeEventListener('click', createActivity);
+                    document.getElementById('rock-paper-scissors').removeEventListener('click', createActivity);
+                }, { once: true });
+
+
+                setTimeout(() => {
+                    document.addEventListener('click', (e) => {
+                        if (!e.target.closest('.dropdown')) {
+                            dropdown.hide();
+                        }
+                    }, { once: true });
+                }, 10);
+
+
             } else {
-                var popover = new bootstrap.Popover(document.getElementById('activityTris'), {
+                var popover = new bootstrap.Popover(document.getElementById('activity'), {
                     content: 'User not found',
                     title: 'Error',
                     trigger: 'manual',
@@ -222,9 +273,16 @@
                     customClass: 'error-popover'
                 });
                 popover.show();
+
+
                 setTimeout(() => {
-                    popover.hide();
+                    popover.hide()
+                    document.getElementById('activity').addEventListener('hidden.bs.popover', () => {
+                        popover.dispose();
+
+                    }, { once: true });
                 }, 2000);
+
 
             }
 
@@ -255,20 +313,6 @@
 
         socket.on("activity created", (data) => {
             if (data.type == "tris") {
-                /*data: 
-{
-            player1: socket.id,
-            player2: data.user,
-            type: data.type,
-            channel: currentChannel,
-            board: [['', '', ''], ['', '', ''], ['', '', '']],
-            currentPlayer: "X",
-            win: false, 
-            draw: false,
-            startTime: Date.now(),
-            id: 0, //random: 1-1000000
-        }
-                */
                 const item = document.createElement('li');
                 item.classList = 'list-group-item text-center';
                 const board = document.createElement('div');
